@@ -21,10 +21,11 @@ NOTIFY = 2
 # Notify [2, "event_name", [param1, param2, ...]]
 
 class DebugRpcServer:
-    def __init__(self, host: str, port) -> None:
+    def __init__(self, host: str, port, callback:callable) -> None:
 
-        self.host = host
-        self.port = port
+        self._host = host
+        self._port = port
+        self._callback = callback
 
         self._running_tasks = {}
 
@@ -37,13 +38,13 @@ class DebugRpcServer:
         server = None
         while True:
             try:
-                server = await asyncio.start_server(self.handle_client, self.host, self.port)
+                server = await asyncio.start_server(self.handle_client, self._host, self._port)
                 addr = server.sockets[0].getsockname()
                 logger.info(f"RPC Server listening on {addr}")
                 async with server:
                     await server.serve_forever()
             except asyncio.CancelledError:
-                logger.info(f"Server stopped {self.host}:{self.port}")
+                logger.info(f"Server stopped {self._host}:{self._port}")
                 return
             except Exception as e:
                 logger.exception(f'RPC Server error: {e}, reconnect')
@@ -70,15 +71,7 @@ class DebugRpcServer:
 
                 for request in unpacker:
                     logger.debug(f'{request}')
-                    if request[0] == REQUEST:
-                        await self._handle_request(request, writer)
-
-                    elif request[0] == NOTIFY:
-                        await self._handle_notify(request)
-
-                    else:
-                        logger.warning(f"Error type message {request}")
-
+                    self._callback(request)
             except (asyncio.IncompleteReadError, ConnectionResetError):
                 break
             except Exception as e:
@@ -116,13 +109,3 @@ class DebugRpcServer:
         packed = msgpack.packb(raw_msg, use_bin_type=True)
         writer.write(packed)
         await writer.drain()
-
-
-async def run_rpc_server(host: str, port: int):
-    server = DebugRpcServer(host, port)
-    try:
-        await server.start()
-        while True:
-            await asyncio.sleep(3600)
-    finally:
-        server.stop()
