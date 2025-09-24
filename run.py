@@ -29,7 +29,8 @@ class LogWriter:
             method_name = request[2]
             params = request[3]
             print(f"Request id: {req_id}, method name: {method_name}, params: {params}")
-        elif request[0] == 1:
+
+        elif request[0] == 2:
             method_name = request[1]
             params = request[2]
 
